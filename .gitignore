@@ -1,0 +1,12 @@
+# папки IDE
+.idea
+
+#docker
+docker/.env
+
+# composer
+vendor
+.composer
+
+# кэш cod style fixer'а
+.php_cs.cache

@@ -1,0 +1,15 @@
+{
+    "name": "NPF/Autopay Bot",
+    "type": "project",
+    "require": {
+        "symfony/console": "~3.4"
+    },
+    "require-dev": {
+        "friendsofphp/php-cs-fixer": "~2.12",
+        "codeception/codeception": "~2.4"
+    },
+    "autoload": {
+        "psr-4": { "app\\": "lib/" }
+    },
+    "scripts": {}
+}
