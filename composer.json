@@ -2,7 +2,8 @@
     "name": "NPF/Autopay Bot",
     "type": "project",
     "require": {
-        "symfony/console": "~3.4"
+        "symfony/console": "~3.4",
+        "psr/log": "~1.0"
     },
     "require-dev": {
         "friendsofphp/php-cs-fixer": "~2.12",
