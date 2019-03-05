@@ -1,15 +1,19 @@
 {
-    "name": "NPF/Autopay Bot",
+    "name": "npf/autopay_bot",
     "type": "project",
     "require": {
-        "symfony/console": "~3.4"
+        "symfony/console": "~3.4",
+        "guzzlehttp/guzzle": "^6.3"
     },
     "require-dev": {
         "friendsofphp/php-cs-fixer": "~2.12",
         "codeception/codeception": "~2.4"
     },
     "autoload": {
-        "psr-4": { "app\\": "lib/" }
+        "psr-4": {
+            "NPF\\Autopay\\Bot\\": "lib/",
+            "NPF\\Autopay\\Bot\\Service\\": "lib/service"
+        }
     },
     "scripts": {}
 }
