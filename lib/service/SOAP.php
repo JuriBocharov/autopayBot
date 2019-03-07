@@ -2,18 +2,27 @@
 
 namespace NPF\Autopay\Bot\Service;
 
+use Psr\Log\LoggerInterface;
+
 /**
  * Класс для подключения к сервису НПФ Сбербанка.
  */
 class SOAP
 {
+    /*
+     * @var SoapClient указатель на soap клиент
+     */
     protected $soapClient;
 
-    public function __construct()
+
+    public function __construct($wsdl, array $options = null, LoggerInterface $logger, $debug = null)
     {
         // todo вынести настройки
         // todo error
-        $this->soapClient = new \SoapClient(); // todo add wsdl
+        if (!$options) {
+            $options = ['exceptions' => true];
+        }
+        $this->soapClient = new \SoapClient($wsdl, $options); // todo add wsdl
     }
 
     /**
@@ -32,28 +41,43 @@ class SOAP
             ]
         );
 
-        return $result;
+        return $this->toArray($result);
     }
 
     /**
      * Получить очередь на проведение автоплатежей.
      */
-    protected function GetAutoPayHistList()
+    public function GetAutoPayHistList()
     {
         $params = [];
-        $userParams = [];
-//        $userParams = ['Company' => 'ЛК', 'UserID' => $UserID, 'UserLogin' => $UserLogin];
-        $result = $this->WSRequest(__FUNCTION__, $params, $userParams);
+        $userParams = ['Company' => 'ЛК', 'UserID' => 0, 'UserLogin' => 'autopay@bot'];
+        $resultWSRequest = $this->WSRequest(__FUNCTION__, $params, $userParams);
+        $result = json_decode($resultWSRequest, true);
 
         return $result['ResponseParams'];
     }
 
     /**
      * Изменить статус проведения автоплатежа.
+     *
+     * @param $histGUID
+     * @param $histStatus
+     * @param $histStatusDetail
+     *
+     * @return mixed
      */
-    protected function ChangeAutoPayHist()
+    public function ChangeAutoPayHist($histGUID, $histStatus, $histStatusDetail)
     {
-        // todo write soap call
+        $userParams = ['Company' => 'ЛК', 'UserID' => 0, 'UserLogin' => 'autopay@bot'];
+        $params = [
+            'AutoPayHistGUID' => $histGUID,
+            'AutoPayHistStatus' => $histStatus,
+            'AutoPayHistStatusDetail' => $histStatusDetail,
+        ];
+        $userParams = ['Company' => 'ЛК', 'UserID' => 0, 'UserLogin' => 'autopay@bot'];
+        $result = $this->WSRequest('ChangeAutoPayHist', $params, $userParams);
+
+        return $result->Response->ResponseStatus;
     }
 
     /**
@@ -68,11 +92,8 @@ class SOAP
      */
     protected function WSRequest($method, array $params = [], array $userParams = ['Company' => 'ЛК'])
     {
-        // todo userParams? UserLogin? UserID?
-//        $userParams = ['Company' => 'ЛК', 'UserID' => $UserID, 'UserLogin' => $UserLogin];
         $params = array_merge(['Method' => $method], $params);
 
-        // todo get json soap call
         $result = $this->doSoapCall(
             'WSRequest',
             [
@@ -81,8 +102,7 @@ class SOAP
             ]
         );
 
-        // todo json? to array?
-        return json_decode($result, true);
+        return $result;
     }
 
     /**
@@ -116,6 +136,12 @@ class SOAP
             );
         }
 
+        if (!empty($result->ResponseStatus) && $result->ResponseStatus === 99) {
+            throw new Exception($result->ResponseMessage);
+        } elseif (!empty($result->Response->ResponseStatus) && $result->Response->ResponseStatus === 99) {
+            throw new Exception($result->Response->ResponseMessage);
+        }
+
         // todo check status
         // todo log
 
@@ -133,5 +159,30 @@ class SOAP
     protected function objectToArray($value)
     {
         return (array) $value;
+    }
+
+    /**
+     * Преобразует объект к массиву.
+     *
+     * @param mixed $value
+     *
+     * @return array
+     */
+    protected function toArray($value)
+    {
+        $return = null;
+
+        if (is_object($value)) {
+            $return = $this->toArray((array) $value);
+        } elseif (is_array($value)) {
+            $return = [];
+            foreach ($value as $key => $item) {
+                $return[$key] = $this->toArray($item);
+            }
+        } else {
+            $return = $value;
+        }
+
+        return $return;
     }
 }

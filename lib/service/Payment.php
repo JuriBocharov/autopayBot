@@ -25,15 +25,19 @@ class Payment
      */
     protected $client;
 
-    public function __construct()
+    public function __construct($url, $userName, $password)
     {
         // todo заполнить настройки
-        $this->url = '';
+        $this->url = $url;
 
         $this->options = [
-            'userName' => '',
-            'password' => '',
+            'userName' => $userName,
+            'password' => $password,
         ];
+
+        if (!$this->client) {
+            $this->client = new GuzzleHttp\Client();
+        }
     }
 
     /**
@@ -41,7 +45,21 @@ class Payment
      */
     public function setClient(GuzzleHttp\Client $client)
     {
-        $this->client = $client;
+            $this->client = $client;
+    }
+
+    /**
+     *
+     *
+     * @param array $params
+     *
+     * @return array
+     *
+     * @throws GuzzleHttp\Exception\GuzzleException
+     */
+    public function getBindings(array $params)
+    {
+        return $this->doRequest(__FUNCTION__, $params);
     }
 
     /**
@@ -91,7 +109,7 @@ class Payment
      * Формирует данные для запроса к сервису, обрабатывает и возвращает ответ.
      *
      * @param string $operation
-     * @param array $params
+     * @param array  $params
      * @param string $method
      *
      * @return array
@@ -109,13 +127,12 @@ class Payment
 
             $result = $this->client->send($request)->getBody()->getContents();
 
-            return (array)json_decode($result);
+            return (array) json_decode($result);
         } catch (\Exception $exception) {
             return [];
             // todo log
             // todo return
         }
-
     }
 
     /**

@@ -7,7 +7,7 @@ use GuzzleHttp\Psr7\Response;
 use NPF\Autopay\Bot\Service\Payment;
 
 /**
- * Класс для тестирования сервиса оплаты
+ * Класс для тестирования сервиса оплаты.
  */
 class PaymentTest extends \Codeception\Test\Unit
 {
@@ -47,7 +47,7 @@ class PaymentTest extends \Codeception\Test\Unit
 
         $this->assertSame(['result' => 'value'], $result);
     }
-    
+
     public function testGetOrderStatusExtended()
     {
         $mock = new MockHandler([
