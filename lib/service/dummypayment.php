@@ -7,5 +7,4 @@ namespace NPF\Autopay\Bot\Service;
  */
 class DummyPayment
 {
-
 }

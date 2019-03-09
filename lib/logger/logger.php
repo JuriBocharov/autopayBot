@@ -56,7 +56,7 @@ class Logger extends AbstractLogger implements LoggerInterface
             throw new Exception("Can't create dir {$dir}");
         }
 
-        $fileName = "autoPayBot_" . (new DateTime())->format("d.m.Y") . '.log';
+        $fileName = 'autoPayBot_' . (new DateTime())->format('d.m.Y') . '.log';
         if (!preg_match('/^[a-zA-Z0-9_\-]+\.log$/', $fileName)) {
             throw new Exception("Wrong file name {$fileName}");
         }

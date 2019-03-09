@@ -2,7 +2,6 @@
 
 namespace app\commands;
 
-use DateTime;
 use NPF\Autopay\Bot\Constant;
 use NPF\Autopay\Bot\Helpers;
 use NPF\Autopay\Bot\Service\DummyPayment;
@@ -27,6 +26,7 @@ class AutopayBot extends Command
     private $logger = null;
 
     private $helper = null;
+
     /**
      * @inheritdoc
      */
@@ -55,7 +55,7 @@ class AutopayBot extends Command
     protected function execute(InputInterface $input, OutputInterface $output)
     {
         $debug = $input->getOption('debug');
-        $env =  $input->getOption('env');
+        $env = $input->getOption('env');
         if ($env !== 'prod') {
             $env = 'dev';
         }
@@ -63,21 +63,20 @@ class AutopayBot extends Command
         $this->Init($debug, $env);
 
         //Получаем список автоплатежей
-        $autopayments = $this->getPageAutopay();
-        if (!empty($autopayments) && is_array($autopayments)) {
+        $autopayments = $this->soapService->GetAutoPayHistList();
+
+        if (!empty($autopayments) && is_array($autopayments['GetAutoPayHistList'])) {
             //В цикле обрабатываем все полученные АП
-            foreach ($autopayments as $autopay) {
-
-
+            foreach ($autopayments['GetAutoPayHistList'] as $autopay) {
+                if ($clientId = $this->getContractNumber($autopay)) {
+                    if ($orderId = $this->registerOrder($autopay, $clientId)) {
+                        $this->payOrder($autopay, $orderId);
+                    }
+                }
             }
         } else {
             //todo: отписываемся в логах что нету ничего, а значит не проводили
         }
-
-
-
-
-
     }
 
     protected function Init($debug, $env)
@@ -108,41 +107,189 @@ class AutopayBot extends Command
         }
     }
 
-    protected function registerOrder($item)
+    protected function getContractNumber(&$autopay)
     {
-        $orderId = '';
-        //Запрашиваем расширенную информацию о АП
-        $autopayExt = $this->soapService->GetAutoPayByGUID($item['AutoPayGUID']);
+        $clientId = '';
+        //Запрашиваем расширенную информацию, нужен номер договора и еще некоторые данные о автоплатеже
+        $autopayExt = $this->soapService->GetAutoPayByGUID($autopay['AutoPayGUID']);
         if (!empty($autopayExt['AutoPayDetail']) && is_array($autopayExt['AutoPayDetail'])) {
-            $clientId = $this->helper->getClientIdReplacement($autopayExt['AutoPayDetail']['ContractNumber']);
+            $autopay = array_merge($autopay, $autopayExt['AutoPayDetail']);
+            $clientId = $this->helper->getClientIdReplacement($autopay['ContractNumber']);
 
             //реализуем проверку наличия связки через getBindings.do
             $rsRest = $this->payService->getBindings(['clientId' => $clientId]);
-            $data = json_decode($rsRest['RESULT'], true);
-            if ($data['errorCode'] !== 0) {
+            if ($rsRest['errorCode'] !== 0) {
+                //TODO: отключить АП (уточнить метод отключения)
+                $this->DisableAutoPayByBot($autopay['AutoPayGUID']);
                 //todo: закинуть в логирование отсутствие связки
-                //вероятно откючить надо будет
+                $clientId = '';
             }
-
-            //регистрируем платеж
-            $rsPayment = $this->payService->register([
-                'orderNumber' => 0, //todo: сгенерировать
-                'amount' => $item['PayAmount'] * 100, // convert
-                'returnUrl' => 'fake', // sberbank api workaround
-                'clientId' => $clientId,
-                'bindingId' => strtolower($autopayExt['AutoPayDetail']['BindingID']),
-                'description' => 'autopayment',
-                'expirationDate' => $this->helper->getExpirationDate(),
-            ]);
+        } else {
+            //Не нашли такого Автоплатежа (сомнительно, но лучше страхуемся)
+            //Для отключения недостаточно данных или используем  DisableAutoPayByBot
+            //TODO: отключить АП (уточнить метод отключения)
+            $this->DisableAutoPayByBot($autopay['AutoPayGUID']);
+            //todo: закинуть в логирование отсутствие связки
         }
 
+        return $clientId;
     }
 
-    protected function getPageAutopay()
+    /**
+     * Функция регистрирует автоплатеж в шлюзе сбербанка и отчитывается в НПФ.
+     *
+     * @param $item/array AutoPayHistList => [AutoPayGUID,PayDate,PayAmount,AutoPayHistGUID]
+     *
+     * @return string orderId - идентификатор платежа
+     */
+    protected function registerOrder(array &$item, $ContractNumber)
     {
-        $arAutopay = $this->soapService->GetAutoPayHistList();
+        $orderId = '';
+        //Поверяем clientId и вносим корректировки если этот номер есть в ссписках попраки
+        $clientId = $this->helper->getClientIdReplacement($ContractNumber);
 
-        return $arAutopay;
+        //регистрируем автоплатеж
+        $rsPayment = $this->payService->register([
+            'orderNumber' => 0, //todo: Нужен уникальный идентификатор, придумать скрипт генерирования
+            'amount' => $item['PayAmount'] * 100, // convert
+            'returnUrl' => 'fake', // sberbank api workaround
+            'clientId' => $clientId,
+            'bindingId' => strtolower($item['BindingID']),
+            'description' => 'autopayment',
+            'expirationDate' => $this->helper->getExpirationDate(),
+        ]);
+
+        if ($rsPayment['errorCode']) {
+            $logContents = ['status' => 'errorRegistered', 'description' => $rsPayment['errorMessage']];
+            //TODO: отключить АП (уточнить метод отключения)
+            $this->disableAutopay($item['AutoPayDetail']);
+        } else {
+            $orderId = $rsPayment['orderId'];
+            $logContents['register'] = ['status' => 'registered', 'description' => $rsPayment['orderId']];
+
+            //Передаем данные НПФ о состоянии автоплатежа (зарегистрировали)
+            $rsSendResultHPF = $this->soapService->ChangeAutoPayHist(
+                $item['AutoPayGUID'],
+                $logContents['status'],
+                $logContents['description']
+            );
+        }
+
+
+        return $orderId;
     }
 
+    /**
+     * Функция осуществляет проведение автоплатежа и отписывается в НПФ и в логи
+     * @param array $autopay
+     * @param $orderId
+     */
+    protected function payOrder(array &$autopay, $orderId )
+    {
+        $rsPayment = $this->payService->paymentOrderBinding([
+            'mdOrder' => $orderId,
+            'bindingId' => strtolower($autopay['BindingID']),
+        ]);
+
+        if ($rsPayment['https_code']) {
+            //TODO: Нужно будет сгрузить в логер
+            self::log('order pay request curl error', $rsPayment['https_code']);
+        } else {
+            //Проверяем статус проведения (если не пустые "errorCode" и "errorMessage" значит проблемы)
+            if ($rsPayment['errorCode'] && $rsPayment['errorMessage']) {
+                //TODO: Нужно будет сгрузить в логер
+                $logContents = ['status' => 'errorPay' , 'description' => $rsPayment['errorMessage']];
+                if ($rsPayment['errorCode'] == 2) {
+                    //если errorCode == 2 и errorMessage == Связка не найдена,
+                    // отключаем автоплатеж, чтоб не тревожить пользователя
+                    $this->disableAutopay($autopay);
+                }
+            } else {
+                //Получаем расширенный статус автоплатежа
+                $payStatus = $this->payService->getOrderStatusExtended(['orderId' => $orderId]);
+
+                if ($payStatus['https_code']) {
+                    //TODO: Нужно будет сгрузить в логер  'order pay status request curl error';
+                    $logContents = ['status' => 'errorStatus' , 'description' => "Can't get status after order paid, but seems success"];
+
+                } else {
+                    if ($payStatus['orderStatus'] == 2) {
+                        $logContents = ['status' => 'paid' , 'description' => $payStatus['errorMessage']];
+                    } else {
+                        $logContents = ['status' => 'error' , 'description' => implode(',', [
+                            $payStatus['orderStatus'],
+                            $payStatus['errorMessage'],
+                            $payStatus['actionCode'],
+                            $payStatus['actionCodeDescription'],
+                        ])];
+                    }
+                }
+            }
+        }
+        //Передаем данные НПФ о состоянии автоплатежа (зарегистрировали)
+        $rsSendResultHPF = $this->soapService->ChangeAutoPayHist(
+            $autopay['AutoPayHistGUID'],
+            $logContents['status'],
+            $logContents['description']
+        );
+    }
+
+    /**
+     * Отключает автоплатеж на стороне НПФ.
+     *
+     * @param $data / array
+     *
+     * @return int
+     */
+    private function disableAutopay($data)
+    {
+        $return = false;
+        $rs = $this->soapService->ChangeAutoPay(
+            $data['AutoPayGUID'],
+            $data['PayDay'],
+            $data['Periodicity'],
+            2,
+            $data['PayAmount']
+        );
+        if ($rs) {
+            $return = true;
+        }
+
+        return $return;
+    }
+
+    private function DisableAutoPayByBot($AutoPayGUID)
+    {
+        $return = false;
+        $rs = $this->soapService->DisableAutoPayByBot($AutoPayGUID);
+        if ($rs) {
+            $return = true;
+        }
+
+        return $return;
+    }
+
+    /**
+     * По коду ошибки ответа формирует описание  ошибки
+     *
+     * @param int $code - код ошибки
+     *
+     * @return string - описание
+     */
+    private static function statusDesc($code = 0)
+    {
+        switch ($code) {
+            case 101:
+                $desc = 'Истек срок действия карты';
+                break;
+            case 107:
+            case 120:
+                $desc = 'Карта заблокирована';
+                break;
+            default:
+                $desc = 'Операция отклонена. Обратитесь в НПФ Сбербанка, тел.: 8 800 555 00 41';
+        }
+
+        return $desc;
+    }
 }

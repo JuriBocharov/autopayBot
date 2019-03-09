@@ -3,6 +3,7 @@
 namespace NPF\Autopay\Bot\Service;
 
 use Psr\Log\LoggerInterface;
+use SoapClient;
 
 /**
  * Класс для подключения к сервису НПФ Сбербанка.
@@ -14,7 +15,6 @@ class SOAP
      */
     protected $soapClient;
 
-
     public function __construct($wsdl, array $options = null, LoggerInterface $logger, $debug = null)
     {
         // todo вынести настройки
@@ -22,7 +22,7 @@ class SOAP
         if (!$options) {
             $options = ['exceptions' => true];
         }
-        $this->soapClient = new \SoapClient($wsdl, $options); // todo add wsdl
+        $this->soapClient = new SoapClient($wsdl, $options); // todo add wsdl
     }
 
     /**
@@ -42,6 +42,92 @@ class SOAP
         );
 
         return $this->toArray($result);
+    }
+
+    /**
+     * Обновление автоплатежа.
+     *
+     * @param string $UserID
+     * @param string $AutoPayGUID
+     * @param string $PayDay
+     * @param string $PayAmount
+     * @param string $Periodicity
+     * @param string $AutoPayStatus
+     *
+     * @return bool
+     */
+    public function ChangeAutoPay($AutoPayGUID, $PayDay, $PayAmount, $Periodicity, $AutoPayStatus)
+    {
+        $result = $this->doSoapCall(
+            'ChangeAutoPay',
+            [
+                'AutoPayGUID' => trim($AutoPayGUID),
+                'PayDay' => $PayDay,
+                'Periodicity' => $Periodicity,
+                'AutoPayStatus' => $AutoPayStatus,
+                'PayAmount' => $PayAmount,
+            ]
+        );
+
+        return $result->ResponseStatus === 0;
+    }
+
+    /**
+     * Отключение автоплатежа.
+     * Сетит автоплатежу AutoPayStatus = 2
+     * $args[0] string AutoPayGUID - внутренний глоб. ид. автоплатежа.
+     *
+     * @param array $args см. выше
+     *
+     * @return array
+     */
+    public function DisableAutoPayByBot($AutoPayGUID)
+    {
+        $result = $this->doSoapCall(
+            'DisableAutoPayByBot',
+            [
+                'AutoPayGUID' => trim($AutoPayGUID),
+            ]
+        );
+
+        return $result->ResponseStatus === 0;
+    }
+
+    /**
+     * (Сохранение информации о проведении автоплатежа).
+     *
+     * $args[0] string AutoPayGUID - внутренний глоб. ид. автоплатежа
+     * $args[1] datetime PayDate -  Дата проведения очередного автоплатежа
+     * $args[2] double PayAmount - сумма автоплатежа
+     * $args[3] string AutoPayHistStatus - Статус проведенного автоплатежа
+     * $args[4] string AutoPayHistStatusDetail - Описание статуса проведенного автоплатежа
+     * $args[5] string AutoPayURL - Ссылка на страницу с квитанцией по проведенному автоплатежу.
+     *
+     * @param array $args см. выше
+     *                    $result['AutoPayHistGUID'] string - Глобальный идентификатор проведенного автоплатежа
+     *
+     * @return array
+     */
+    public function AddAutoPayHist($AutoPayGUID, $PayDate, $PayAmount, $AutoPayHistStatus, $AutoPayHistStatusDetail)
+    {
+        $result = $this->doSoapCall(
+            'AddAutoPayHist',
+            [
+                'AutoPayGUID' => trim($AutoPayGUID),
+                'PayDate' => trim($PayDate),
+                'PayAmount' => trim($PayAmount),
+                'AutoPayHistStatus' => trim($AutoPayHistStatus),
+                'AutoPayHistStatusDetail' => trim($AutoPayHistStatusDetail),
+            ]
+        );
+
+        if (isset($result->GUID)) {
+            $return = $result->GUID;
+        } else {
+            $return = $this->toArray($result);
+        }
+
+        return $return;
     }
 
     /**

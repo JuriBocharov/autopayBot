@@ -45,12 +45,10 @@ class Payment
      */
     public function setClient(GuzzleHttp\Client $client)
     {
-            $this->client = $client;
+        $this->client = $client;
     }
 
     /**
-     *
-     *
      * @param array $params
      *
      * @return array
@@ -125,9 +123,11 @@ class Payment
         try {
             $request = new Request($method, $this->createOperationUrl($operation), $headers, $params);
 
-            $result = $this->client->send($request)->getBody()->getContents();
+            $result = $this->client->send($request);
+            $bodyCotents = (array) json_decode($result->getBody()->getContents());
+            $bodyCotents['https_code'] = $result->getStatusCode();
 
-            return (array) json_decode($result);
+            return  $bodyCotents;
         } catch (\Exception $exception) {
             return [];
             // todo log
