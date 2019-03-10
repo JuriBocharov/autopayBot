@@ -1,6 +1,6 @@
 <?php
 
-use NPF\Autopay\Bot\Logger;
+use NPF\Logger;
 
 $logger = new Logger\Logger();
 

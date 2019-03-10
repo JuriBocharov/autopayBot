@@ -1,18 +1,18 @@
 <?php
 
-namespace app\commands;
+namespace NPF\Commands;
 
-use NPF\Autopay\Bot\Constant;
-use NPF\Autopay\Bot\Helpers;
-use NPF\Autopay\Bot\Service\DummyPayment;
-use NPF\Autopay\Bot\Service\DummyService;
-use NPF\Autopay\Bot\Service\Payment;
-use NPF\Autopay\Bot\Service\SOAP;
+use NPF\Constant;
+use NPF\Helpers;
+use NPF\Service\DummyPayment;
+use NPF\Service\DummyService;
+use NPF\Service\Payment;
+use NPF\Service\SOAP;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Input\InputOption;
-use NPF\Autopay\Bot\Logger;
+use NPF\Logger;
 
 /**
  * Консольная командя для запуска автоплатежного бота.
@@ -56,6 +56,7 @@ class AutopayBot extends Command
     {
         $debug = $input->getOption('debug');
         $env = $input->getOption('env');
+
         if ($env !== 'prod') {
             $env = 'dev';
         }

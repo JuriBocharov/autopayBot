@@ -11,8 +11,7 @@
     },
     "autoload": {
         "psr-4": {
-            "NPF\\Autopay\\Bot\\": "lib/",
-            "NPF\\Autopay\\Bot\\Service\\": "lib/service"
+            "NPF\\": "lib/"
         }
     },
     "scripts": {}

@@ -1,6 +1,6 @@
 <?php
 
-namespace NPF\Autopay\Bot\Service;
+namespace NPF\Service;
 
 class Exception extends \Exception
 {

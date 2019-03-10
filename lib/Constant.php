@@ -1,6 +1,6 @@
 <?php
 
-namespace NPF\Autopay\Bot;
+namespace NPF;
 
 class Constant
 {

@@ -1,6 +1,6 @@
 <?php
 
-namespace NPF\Autopay\Bot\Logger;
+namespace NPF\Logger;
 
 use DateTime;
 use Psr\Log\AbstractLogger;

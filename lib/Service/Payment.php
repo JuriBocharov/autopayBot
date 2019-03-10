@@ -1,6 +1,6 @@
 <?php
 
-namespace NPF\Autopay\Bot\Service;
+namespace NPF\Service;
 
 use GuzzleHttp;
 use GuzzleHttp\Psr7\Request;
@@ -27,7 +27,6 @@ class Payment
 
     public function __construct($url, $userName, $password)
     {
-        // todo заполнить настройки
         $this->url = $url;
 
         $this->options = [
@@ -120,19 +119,19 @@ class Payment
         $headers = ['Content-Type' => 'application/json'];
         $params = json_encode(array_merge($params, $this->options));
 
-        try {
-            $request = new Request($method, $this->createOperationUrl($operation), $headers, $params);
+        //try {
+            $request = new Request($method, $this->createOperationUrl($operation), [], $params);
 
             $result = $this->client->send($request);
-            $bodyCotents = (array) json_decode($result->getBody()->getContents());
+            $bodyCotents = json_decode($result->getBody()->getContents(), true);
             $bodyCotents['https_code'] = $result->getStatusCode();
 
             return  $bodyCotents;
-        } catch (\Exception $exception) {
+        /*} catch (\Exception $exception) {
             return [];
             // todo log
             // todo return
-        }
+        }*/
     }
 
     /**

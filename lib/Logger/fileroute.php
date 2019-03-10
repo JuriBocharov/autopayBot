@@ -1,8 +1,8 @@
 <?php
 
-namespace NPF\Autopay\Bot\Logger\Routes;
+namespace NPF\Logger\Routes;
 
-use NPF\Autopay\Bot\Logger\Route;
+use NPF\Logger\Route;
 
 /**
  * Class FileRoute.
