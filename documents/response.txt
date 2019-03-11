@@ -1,0 +1,33 @@
+http://192.168.10.97/wsnpf/IIwsNPF.asmx?WSDL
+
+
+GetAutoPayByGUID ->
+[AutoPayDetail] => Array
+(
+	[ContractNumber] => 999-9008-000468165
+	[AutoPayGUID] => 5B3A3FEB-53B6-46D1-801A-4F2E18676E06
+	[CreateDate] => 2017-07-01T17:11:46.390Z
+	[PayDay] => 2
+	[Periodicity] => 0
+	[AutoPayStatus] => 1
+	[PayAmount] => 1000
+	[BindingID] => 9658A135-C975-4D26-A502-2E9D86ABBE35
+	[MobilePhone] => +7 (951) 462-70-90
+	[CardPan] => 427687**7771
+)
+
+
+{"AutoPayHistList":[
+	{"AutoPayGUID":"5B3A3FEB-53B6-46D1-801A-4F2E18676E06",
+	"PayDate":"02.02.2018",
+	"PayAmount":"150000.00",
+	"AutoPayHistGUID":"01E4B296-2386-4A6B-B1D9-5FA07A351CCD"}
+]}
+
+
+
+AddAutoPayHist -> ChangeAutoPayHist  - заменил, но решение под вопросом????
+DisableAutoPayByBot -> ChangeAutoPay  - отключение заменил на изменение, логично, но под вопросом????
+
+
+ docker-compose exec -u $UID php php composer dump-autoload
