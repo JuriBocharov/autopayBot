@@ -54,6 +54,8 @@ class testBot extends Command
             'User Creator',
             '============',
             '',
+            $debug,
+            $env,
             var_dump($rsRest)
         ]);
     }
