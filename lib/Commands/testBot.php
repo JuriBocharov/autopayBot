@@ -54,7 +54,7 @@ class testBot extends Command
             'User Creator',
             '============',
             '',
-            Constant::NPF_WSDL_TEST,
+            var_dump($rsRest)
         ]);
     }
 }

@@ -120,7 +120,7 @@ class Payment
         $params = json_encode(array_merge($params, $this->options));
 
         //try {
-            $request = new Request($method, $this->createOperationUrl($operation), [], $params);
+            $request = new Request($method, $this->createOperationUrl($operation), $headers, $params);
 
             $result = $this->client->send($request);
             $bodyCotents = json_decode($result->getBody()->getContents(), true);

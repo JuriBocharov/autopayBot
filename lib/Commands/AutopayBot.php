@@ -121,7 +121,7 @@ class AutopayBot extends Command
             $rsRest = $this->payService->getBindings(['clientId' => $clientId]);
             if ($rsRest['errorCode'] !== 0) {
                 //TODO: отключить АП (уточнить метод отключения)
-                $this->DisableAutoPayByBot($autopay['AutoPayGUID']);
+                $this->disableAutopay($autopay);
                 //todo: закинуть в логирование отсутствие связки
                 $clientId = '';
             }
