@@ -116,11 +116,12 @@ class Payment
     protected function doRequest($operation, array $params, $method = 'GET')
     {
         // todo log
-        $headers = ['Content-Type' => 'application/json'];
-        $params = json_encode(array_merge($params, $this->options));
+        //$headers = ['Content-Type' => 'application/json'];
+        //$params = json_encode(array_merge($params, $this->options));
+        $params = array_merge($params, $this->options);
 
         //try {
-            $request = new Request($method, $this->createOperationUrl($operation), $headers, $params);
+            $request = new Request($method, $this->createOperationUrl($operation), [], $params);
 
             $result = $this->client->send($request);
             $bodyCotents = json_decode($result->getBody()->getContents(), true);
