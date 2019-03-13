@@ -7,4 +7,5 @@ namespace NPF\Service;
  */
 class DummyService
 {
+
 }

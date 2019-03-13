@@ -48,6 +48,7 @@ class Payment
     }
 
     /**
+     * Проверяет наличие связки для проведения АП
      * @param array $params
      *
      * @return array
