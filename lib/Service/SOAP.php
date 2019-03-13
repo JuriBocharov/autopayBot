@@ -15,14 +15,32 @@ class SOAP
      */
     protected $soapClient;
 
-    public function __construct($wsdl, array $options = null, LoggerInterface $logger, $debug = null)
+    protected $loger = null;
+
+    protected $debug = null;
+
+    /**
+     * SOAP constructor.
+     *
+     * @param $wsdl
+     * @param array|null           $options
+     * @param LoggerInterface|null $logger
+     * @param null                 $debug
+     */
+    public function __construct($wsdl, array $options = null, LoggerInterface $logger = null, $debug = null)
     {
-        // todo вынести настройки
-        // todo error
         if (!$options) {
             $options = ['exceptions' => true];
         }
-        $this->soapClient = new SoapClient($wsdl, $options); // todo add wsdl
+        $this->soapClient = new SoapClient($wsdl, $options);
+
+        if ($logger) {
+            $this->loger = $logger;
+        }
+
+        if ($debug) {
+            $this->debug = $debug;
+        }
     }
 
     /**
@@ -233,6 +251,43 @@ class SOAP
 
         // todo check result?
         return $this->objectToArray($result);
+    }
+
+    /**
+     * @param \Exception $e
+     *
+     * @throws \Sbnpf\Service\Exception
+     */
+    protected function catchException(\Exception $e)
+    {
+        if ($this->logger) {
+            $this->logger->error($e->getMessage(), [
+                'MODULE_ID' => 'sbnpf.service',
+                'AUDIT_TYPE_ID' => 'sbnpf_service_soap_exception',
+                'ITEM_ID' => get_class($e),
+            ]);
+        }
+
+        throw new Exception($e->getMessage(), $e->getCode(), $e);
+    }
+
+    /**
+     * Записывает информацию в лог.
+     *
+     * @param string $type
+     * @param string $itemId
+     * @param array  $params
+     */
+    protected function debugInfo($type, $itemId, array $params)
+    {
+        if ($this->logger && $this->debug) {
+            $message = json_encode($params, JSON_UNESCAPED_UNICODE);
+            $this->logger->info($message, [
+                'MODULE_ID' => 'soap.service',
+                'AUDIT_TYPE_ID' => $type,
+                'ITEM_ID' => $itemId,
+            ]);
+        }
     }
 
     /**

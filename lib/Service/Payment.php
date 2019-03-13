@@ -56,7 +56,7 @@ class Payment
      */
     public function getBindings(array $params)
     {
-        return $this->doRequest(__FUNCTION__, $params);
+        return $this->doRequest(__FUNCTION__, $params, 'POST');
     }
 
     /**
@@ -99,7 +99,7 @@ class Payment
      */
     public function getOrderStatusExtended(array $params)
     {
-        return $result = $this->doRequest(__FUNCTION__, $params);
+        return $result = $this->doRequest(__FUNCTION__, $params, 'POST');
     }
 
     /**
@@ -116,18 +116,17 @@ class Payment
     protected function doRequest($operation, array $params, $method = 'GET')
     {
         // todo log
-        //$headers = ['Content-Type' => 'application/json'];
-        //$params = json_encode(array_merge($params, $this->options));
-        $params = array_merge($params, $this->options);
+        $headers = ['Content-Type' => 'application/x-www-form-urlencoded'];
+        $params = http_build_query(array_merge($params, $this->options));
 
         //try {
-            $request = new Request($method, $this->createOperationUrl($operation), [], $params);
+        $request = new Request($method, $this->createOperationUrl($operation), $headers, $params);
 
-            $result = $this->client->send($request);
-            $bodyCotents = json_decode($result->getBody()->getContents(), true);
-            $bodyCotents['https_code'] = $result->getStatusCode();
+        $result = $this->client->send($request);
+        $bodyCotents = json_decode($result->getBody()->getContents(), true);
+        $bodyCotents['https_code'] = $result->getStatusCode();
 
-            return  $bodyCotents;
+        return  $bodyCotents;
         /*} catch (\Exception $exception) {
             return [];
             // todo log

@@ -16,7 +16,7 @@ class FileRoute extends Route
     /**
      * @var string Шаблон сообщения
      */
-    public $template = '{date} {level} {message} {context}';
+    public $template = '{date} : {level} : {message} : {context}';
 
     /**
      * @inheritdoc

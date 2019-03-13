@@ -15,6 +15,7 @@ use Symfony\Component\Console\Input\InputOption;
 class testBot extends Command
 {
     private $payService;
+
     /**
      * @inheritdoc
      */
@@ -27,11 +28,6 @@ class testBot extends Command
                 null,
                 InputOption::VALUE_IS_ARRAY | InputOption::VALUE_REQUIRED,
                 'You must specify the debug status'
-            )->addOption(
-                'env',
-                null,
-                InputOption::VALUE_IS_ARRAY | InputOption::VALUE_REQUIRED,
-                'Runtime Environment'
             );
     }
 
@@ -43,11 +39,11 @@ class testBot extends Command
     protected function execute(InputInterface $input, OutputInterface $output)
     {
         $debug = reset($input->getOption('debug'));
-        $env = reset($input->getOption('env'));
+        $env = getenv('APP_ENV');
 
         $this->payService = new Payment(Constant::SB_API_TEST, Constant::MERCHANT_LOGIN_TEST, Constant::MERCHANT_PASSWORD_TEST);
 
-        $clientId = '8968';
+        $clientId = '999-9003-000131668';
         $rsRest = $this->payService->getBindings(['clientId' => $clientId]);
 
         $output->writeln([
@@ -56,7 +52,7 @@ class testBot extends Command
             '',
             $debug,
             $env,
-            var_dump($rsRest)
+            var_dump($rsRest),
         ]);
     }
 }

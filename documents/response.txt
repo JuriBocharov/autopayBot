@@ -24,6 +24,19 @@ GetAutoPayByGUID ->
 	"AutoPayHistGUID":"01E4B296-2386-4A6B-B1D9-5FA07A351CCD"}
 ]}
 
+new redaction:
+
+{"AutoPayHistList":[
+	{"AutoPayGUID":"5B3A3FEB-53B6-46D1-801A-4F2E18676E06",
+	"PayDate":"02.02.2018",
+	"PayAmount":"150000.00",
+	"AutoPayHistGUID":"01E4B296-2386-4A6B-B1D9-5FA07A351CCD",
+	"ContractNumber": "",
+	"BindingID":""
+	"Periodicity":"" //отсутствует !!!!!!!!!!!!
+	}
+]}
+
 
 
 AddAutoPayHist -> ChangeAutoPayHist  - заменил, но решение под вопросом????
