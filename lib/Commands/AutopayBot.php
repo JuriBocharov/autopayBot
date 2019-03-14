@@ -4,6 +4,8 @@ namespace NPF\Commands;
 
 use NPF\Constant;
 use NPF\Helpers;
+use NPF\Logger\Logger;
+use NPF\Logger\FileRoute;
 use NPF\Service\DummyPayment;
 use NPF\Service\DummyService;
 use NPF\Service\Payment;
@@ -12,7 +14,6 @@ use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Input\InputOption;
-use NPF\Logger;
 
 /**
  * Консольная командя для запуска автоплатежного бота.
@@ -37,7 +38,7 @@ class AutopayBot extends Command
      */
     protected function configure()
     {
-        $this->setName('app:run_autyopay')
+        $this->setName('app:run_autopay')
             ->setDescription('Run the execution of auto payments')
             ->addOption(
                 'debug',
@@ -59,8 +60,8 @@ class AutopayBot extends Command
      */
     protected function execute(InputInterface $input, OutputInterface $output)
     {
-        $this->debug = $input->getOption('debug');
-        $env = $input->getOption('env');
+        $this->debug = reset($input->getOption('debug'));
+        $env = reset($input->getOption('env'));
 
         if ($env !== 'prod') {
             $env = 'dev';
@@ -71,15 +72,15 @@ class AutopayBot extends Command
         //Получаем список автоплатежей
         $autopayments = $this->soapService->GetAutoPayHistList();
 
-        if (!empty($autopayments) && is_array($autopayments['GetAutoPayHistList'])) {
+        if (!empty($autopayments) && is_array($autopayments['AutoPayHistList'])) {
             //В цикле обрабатываем все полученные АП
-            foreach ($autopayments['GetAutoPayHistList'] as $autopay) {
+            foreach ($autopayments['AutoPayHistList'] as $autopay) {
                 if ($clientId = $this->getContractNumber($autopay)) {
                     if ($orderId = $this->registerOrder($autopay, $clientId)) {
                         $this->payOrder($autopay, $orderId);
                     }
                 }
-                $this->Log();   //Сохраняем накопленный  статус в логах
+                $this->Log($autopay['AutoPayGUID']);   //Сохраняем накопленный  статус в логах
             }
         } else {
             if ($this->logger) {
@@ -93,10 +94,10 @@ class AutopayBot extends Command
         /*
          * Инициируем логер
          */
-        $this->logger = new Logger\Logger();
+        $this->logger = new Logger();
 
         // Логи будем писать в файл
-        $this->logger->routes->attach(new Logger\Routes\FileRoute([
+        $this->logger->routes->attach(new FileRoute([
             'isEnable' => true,
             'filePath' => $this->logger->getPathToFile(),
         ]));
@@ -108,8 +109,8 @@ class AutopayBot extends Command
             $this->payService = new DummyPayment();
         } else {
             if ($env === 'prod') {
-                $this->soapService = new SOAP(Constant::NPF_WSDL, ['exceptions' => true], $this->logger, $debug);
-                $this->payService = new Payment(Constant::SB_API, Constant::MERCHANT_LOGIN, Constant::MERCHANT_PASSWORD);
+                //$this->soapService = new SOAP(Constant::NPF_WSDL, ['exceptions' => true], $this->logger, $debug);
+                //$this->payService = new Payment(Constant::SB_API, Constant::MERCHANT_LOGIN, Constant::MERCHANT_PASSWORD);
             } else {
                 $this->soapService = new SOAP(Constant::NPF_WSDL_TEST, ['exceptions' => true], $this->logger, $debug);
                 $this->payService = new Payment(Constant::SB_API_TEST, Constant::MERCHANT_LOGIN_TEST, Constant::MERCHANT_PASSWORD_TEST);
@@ -122,14 +123,21 @@ class AutopayBot extends Command
         $clientId = '';
 
         //Реализуем проверку на замену (связано со старой ошибкой в первом ЛК)
-        $clientId = $this->helper->getClientIdReplacement($autopay['ContractNumber']);
+        $clientId = $this->helper->getClientIdReplacement($autopay['ContractNumber'], $autopay['AutoPayGUID']);
 
         //реализуем проверку наличия связки через getBindings.do
         //(раньше просто требовали дергать этот сервис, незнамо зачем)
         $rsRest = $this->payService->getBindings(['clientId' => $clientId]);
         if ($rsRest['errorCode'] !== 0) {
             $this->disableAutopay($autopay);
-            $this->logContents = ['status' => 'errorGetBindings', 'description' => "clientId={$clientId}"];
+            $this->logContents = [
+                'status' => 'ERROR',
+                'description' => [
+                        'method' => 'getBindings',
+                        'status' => 'errorGetBindings',
+                        "clientId={$clientId}",
+                    ],
+            ];
         }
 
         return $clientId;
@@ -158,16 +166,34 @@ class AutopayBot extends Command
         ]);
 
         if ($rsPayment['errorCode']) {
-            $this->logContents = ['status' => 'errorRegistered', 'description' => $rsPayment['errorMessage']];
             //отключить АП так как errorCode приходит только при ошибке
             $this->disableAutopay($item);
+            $this->logContents = [
+                'status' => 'ERROR',
+                'description' => [
+                        'method' => 'register',
+                        'status' => 'errorRegistered',
+                        'statusDesc' => $rsPayment['errorMessage'],
+                        'disabled_by_robot, errorCode = ' . $rsPayment['errorCode'],
+                    ],
+            ];
         } else {
             $orderId = $rsPayment['orderId'];
-            $this->logContents['register'] = ['status' => 'registered', 'description' => $rsPayment['orderId']];
-
-            //Передаем данные НПФ о состоянии автоплатежа (зарегистрировали)
-            $rsSendResultHPF = $this->soapService->ChangeAutoPayHist($item['AutoPayHistGUID'], 'registered', $rsPayment['orderId']);
+            $this->logContents = [
+                'status' => 'INFO',
+                'description' => [
+                        'method' => 'register',
+                        'status' => 'register',
+                        'statusDesc' => $rsPayment['orderId'],
+                    ],
+            ];
         }
+        //Передаем данные НПФ о состоянии автоплатежа (зарегистрировали)
+        $this->soapService->ChangeAutoPayHist(
+            $item['AutoPayHistGUID'],
+            $this->logContents['description']['status'],
+            $this->logContents['description']['statusDesc']
+        );
 
         return $orderId;
     }
@@ -189,56 +215,110 @@ class AutopayBot extends Command
 
         if ($rsPayment['https_code'] != 200) {
             //Отчитываемся в лог, что не смогли достучаться до платежного шлюза
-            $this->logContents = ['status' => 'errorPay', 'description' => "order pay request curl error, https_status={$rsPayment['https_code']}"];
+            $this->logContents = [
+                'status' => 'ERROR',
+                'description' => [
+                        'method' => 'paymentOrderBinding',
+                        'status' => 'errorPay',
+                        "order pay request curl error, https_status={$rsPayment['https_code']}",
+                    ],
+            ];
         } else {
             //Проверяем статус проведения (если не пустые "errorCode" и "errorMessage" значит проблемы)
             if ($rsPayment['errorCode'] && $rsPayment['errorMessage']) {
                 //Отчитываемся в логи об ошибках
-                $this->logContents = ['status' => 'errorPay', 'description' => $rsPayment['errorMessage']];
+                $this->logContents = [
+                    'status' => 'ERROR',
+                    'description' => [
+                            'method' => 'paymentOrderBinding',
+                            'status' => 'errorPay',
+                            'statusDesc' => $rsPayment['errorMessage'],
+                            'desc' => "errorMessage = {$rsPayment['errorMessage']}, errorCode = {$rsPayment['errorCode']}",
+                        ],
+                ];
 
                 if ($rsPayment['errorCode'] == 2) {
                     //если errorCode == 2 и errorMessage == Связка не найдена, отключаем автоплатеж, чтоб не тревожить пользователя
                     $this->disableAutopay($autopay);
+                    $this->logContents = [
+                        'status' => 'ERROR',
+                        'description' => [
+                                'method' => 'paymentOrderBinding',
+                                'status' => 'disabled_by_robot',
+                                'statusDesc' => $rsPayment['errorMessage'],
+                                "errorMessage = {$rsPayment['errorMessage']}, errorCode = {$rsPayment['errorCode']}, autopay disable.",
+                            ],
+                    ];
                 }
             } else {
                 //Получаем расширенный статус автоплатежа
                 $payStatus = $this->payService->getOrderStatusExtended(['orderId' => $orderId]);
 
                 if ($payStatus['https_code'] != 200) {
-                    $this->logContents = ['status' => 'errorStatus', 'description' => "Can't get status after order paid, but seems success"];
+                    $this->logContents = [
+                        'status' => 'ERROR',
+                        'description' => [
+                                'method' => 'getOrderStatusExtended',
+                                'status' => 'errorStatus',
+                                'statusDesc' => "Can't get status after order paid, but seems success",
+                                "Order pay status request curl error, Can't get status after order paid, but seems success",
+                            ],
+                    ];
                 } else {
                     if ($payStatus['orderStatus'] == 2) {
-                        $this->logContents = ['status' => 'paid', 'description' => $payStatus['errorMessage']];
+                        $this->logContents = [
+                            'status' => 'INFO',
+                            'description' => [
+                                    'method' => 'getOrderStatusExtended',
+                                    'status' => 'paid',
+                                    'statusDesc' => $payStatus['errorMessage'],
+                                ],
+                        ];
                     } else {
-                        $this->logContents = ['status' => 'error', 'description' => implode(',', [
-                            $payStatus['orderStatus'],
-                            $payStatus['errorMessage'],
-                            $payStatus['actionCode'],
-                            $payStatus['actionCodeDescription'],
-                        ])];
+                        $this->logContents = [
+                            'status' => 'ERROR',
+                            'description' => [
+                                    'method' => 'getOrderStatusExtended',
+                                    'status' => 'error',
+                                    'statusDesc' => implode(',', [
+                                        $payStatus['orderStatus'],
+                                        $payStatus['errorMessage'],
+                                        $payStatus['actionCode'],
+                                        $payStatus['actionCodeDescription'],
+                                    ]),
+                                ],
+                        ];
                     }
                 }
             }
+            //Передаем данные НПФ о состоянии автоплатежа (зарегистрировали)
+            $this->soapService->ChangeAutoPayHist(
+                $autopay['AutoPayHistGUID'],
+                $this->logContents['description']['status'],
+                $this->logContents['description']['statusDesc']
+            );
         }
-        //Передаем данные НПФ о состоянии автоплатежа (зарегистрировали)
-        $rsSendResultHPF = $this->soapService->ChangeAutoPayHist(
-            $autopay['AutoPayHistGUID'],
-            $this->logContents['status'],
-            $this->logContents['description']
-        );
 
         // disable autopay by error status
         if (!empty($payStatus) && 2 != $payStatus['orderStatus']) {
             if ($this->helper->getDeactivateStatus($payStatus['actionCode'])) {
-                $this->logContents = [
-                    'status' => 'errorPay',
-                    'description' => "disable autopay by order error, actionCode = {$payStatus['actionCode']}, errorStatus = " . $this->statusDesc($payStatus['actionCode']),
-                ];
                 $this->disableAutopay($autopay);
+                $this->logContents = [
+                    'status' => 'ERROR',
+                    'description' => [
+                        'method' => 'paymentOrderBinding',
+                        'status' => 'errorPay',
+                        'statusDesc' => "disable autopay by order error, actionCode = {$payStatus['actionCode']}, errorStatus = " . $this->statusDesc($payStatus['actionCode']),
+                    ],
+                ];
             } else {
                 $this->logContents = [
-                    'status' => 'errorPay',
-                    'description' => "order error in valid array, skip autopay update. AutoPayGUID={$autopay['AutoPayGUID']}",
+                    'status' => 'ERROR',
+                    'description' => [
+                        'method' => 'paymentOrderBinding',
+                        'status' => 'errorPay',
+                        'statusDesc' => "order error in valid array, skip autopay update. AutoPayGUID={$autopay['AutoPayGUID']}",
+                    ],
                 ];
             }
         }
@@ -307,10 +387,20 @@ class AutopayBot extends Command
         return $desc;
     }
 
-    protected function Log()
+    protected function Log($guid)
     {
         if ($this->logger) {
-            $this->logger->info($this->logContents['status'], $this->logContents['description']);
+            if (!is_array($this->logContents['description'])) {
+                $this->logContents['description'] = [$this->logContents['description']];
+            }
+            switch ($this->logContents['status']) {
+                case 'ERROR':
+                    $this->logger->error($guid, $this->logContents['description']);
+                    break;
+                default:
+                    $this->logger->info($guid, $this->logContents['description']);
+                    break;
+            }
         }
     }
 

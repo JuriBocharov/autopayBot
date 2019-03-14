@@ -51,14 +51,15 @@ class Logger extends AbstractLogger implements LoggerInterface
      */
     public function getPathToFile()
     {
-        $dir = dirname(dirname(__DIR__)) . '/log';
+        $dir = dirname(dirname(__DIR__)) . '/logs';
         if (!is_dir($dir) && !mkdir($dir)) {
             throw new Exception("Can't create dir {$dir}");
         }
 
-        $fileName = 'autoPayBot_' . (new DateTime())->format('d.m.Y') . '.log';
+        $fileName = 'autoPayBot_' . (new \DateTime())->format('dmY') . '.log';
+        //var_dump($dir . '/' . $fileName); die('1');
         if (!preg_match('/^[a-zA-Z0-9_\-]+\.log$/', $fileName)) {
-            throw new Exception("Wrong file name {$fileName}");
+            throw new \Exception("Wrong file name {$fileName}");
         }
 
         return $dir . '/' . $fileName;

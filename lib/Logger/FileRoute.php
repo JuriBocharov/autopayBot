@@ -1,8 +1,6 @@
 <?php
 
-namespace NPF\Logger\Routes;
-
-use NPF\Logger\Route;
+namespace NPF\Logger;
 
 /**
  * Class FileRoute.

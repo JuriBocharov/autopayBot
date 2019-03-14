@@ -2,6 +2,7 @@
 
 namespace NPF;
 
+use DateInterval;
 use DateTime;
 
 class Helpers
@@ -264,8 +265,7 @@ class Helpers
      */
     public function getExpirationDate()
     {
-        $date = new DateTime();
-        $date->add('1D');
+        $date = (new DateTime())->add(new DateInterval('P1D'));
 
         return $date->format(DATE_ISO8601);
     }

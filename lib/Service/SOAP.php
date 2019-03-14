@@ -91,27 +91,6 @@ class SOAP
     }
 
     /**
-     * Отключение автоплатежа.
-     * Сетит автоплатежу AutoPayStatus = 2
-     * $args[0] string AutoPayGUID - внутренний глоб. ид. автоплатежа.
-     *
-     * @param array $args см. выше
-     *
-     * @return array
-     */
-    public function DisableAutoPayByBot($AutoPayGUID)
-    {
-        $result = $this->doSoapCall(
-            'DisableAutoPayByBot',
-            [
-                'AutoPayGUID' => trim($AutoPayGUID),
-            ]
-        );
-
-        return $result->ResponseStatus === 0;
-    }
-
-    /**
      * (Сохранение информации о проведении автоплатежа).
      *
      * $args[0] string AutoPayGUID - внутренний глоб. ид. автоплатежа
@@ -181,7 +160,7 @@ class SOAP
         $userParams = ['Company' => 'ЛК', 'UserID' => 0, 'UserLogin' => 'autopay@bot'];
         $result = $this->WSRequest('ChangeAutoPayHist', $params, $userParams);
 
-        return $result->Response->ResponseStatus;
+        return $result->Response->ResponseStatus === 0;
     }
 
     /**

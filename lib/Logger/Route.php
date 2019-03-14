@@ -18,7 +18,7 @@ abstract class Route extends AbstractLogger implements LoggerInterface
     /**
      * @var string Формат даты логов
      */
-    public $dateFormat = DateTime::RFC2822;
+    public $dateFormat = DateTime::W3C;
 
     /**
      * Конструктор

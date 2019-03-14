@@ -1,8 +1,7 @@
 <?php
 
-namespace NPF\Autopay\Bot\Logger\Routes;
+namespace NPF\Logger;
 
-use NPF\Autopay\Bot\Logger\Route;
 use Psr\Log\LogLevel;
 
 /**
