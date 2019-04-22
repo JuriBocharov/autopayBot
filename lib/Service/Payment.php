@@ -117,23 +117,17 @@ class Payment
      */
     protected function doRequest($operation, array $params, $method = 'GET')
     {
-        // todo log
         $headers = ['Content-Type' => 'application/x-www-form-urlencoded'];
         $params = http_build_query(array_merge($params, $this->options));
 
-        //try {
         $request = new Request($method, $this->createOperationUrl($operation), $headers, $params);
 
         $result = $this->client->send($request);
+
         $bodyCotents = json_decode($result->getBody()->getContents(), true);
         $bodyCotents['https_code'] = $result->getStatusCode();
 
         return  $bodyCotents;
-        /*} catch (\Exception $exception) {
-            return [];
-            // todo log
-            // todo return
-        }*/
     }
 
     /**
